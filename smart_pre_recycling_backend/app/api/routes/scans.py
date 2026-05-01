@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.models.scan import Scan
-from app.models.user import User
+from app.model.scan import Scan
+from app.model.user import User
 from app.schemas.scan import ScanCreate, ScanResponse
 
 router = APIRouter(prefix="/scans", tags=["Scans"])

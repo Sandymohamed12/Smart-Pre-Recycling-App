@@ -1,12 +1,9 @@
-import 'dart:math';
 import 'dart:typed_data';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../services/api_service.dart';
-import '../../services/user_session.dart';
 
 class ScanPage extends StatefulWidget {
   const ScanPage({super.key});
@@ -22,14 +19,11 @@ class _ScanPageState extends State<ScanPage> {
   Uint8List? webImageBytes;
 
   bool isProcessing = false;
-  bool isSaving = false;
 
   String? result;
-  String? confidence;
   String? recommendation;
-  String? saveMessage;
-
-  double weight = 1.0;
+  List<dynamic>? detections;
+  bool? isRecyclable;
 
   Future<void> pickFromCamera() async {
     await _pickImage(ImageSource.camera);
@@ -57,119 +51,58 @@ class _ScanPageState extends State<ScanPage> {
         selectedImage = picked;
         webImageBytes = bytes;
         result = null;
-        confidence = null;
         recommendation = null;
-        saveMessage = null;
+        detections = null;
+        isRecyclable = null;
       });
 
-      await _fakeClassification();
+      await _realClassification();
     } catch (e) {
       _showSnackBar("Failed to pick image");
     }
   }
 
-  Future<void> _fakeClassification() async {
+  Future<void> _realClassification() async {
+    if (selectedImage == null) return;
+
     setState(() {
       isProcessing = true;
-      saveMessage = null;
-    });
-
-    await Future.delayed(const Duration(seconds: 2));
-
-    final categories = ["plastic", "glass", "metal", "organic"];
-    final random = Random();
-    final selected = categories[random.nextInt(categories.length)];
-    final conf = (0.80 + random.nextDouble() * 0.19).toStringAsFixed(2);
-
-    setState(() {
-      result = selected;
-      confidence = conf;
-      recommendation = _buildRecommendation(selected);
-      isProcessing = false;
-    });
-  }
-
-  String _buildRecommendation(String type) {
-    switch (type.toLowerCase()) {
-      case "plastic":
-        return "Rinse the item and dispose of it in the plastic recycling bin.";
-      case "glass":
-        return "Remove any lids if possible and place it in the glass recycling bin.";
-      case "metal":
-        return "Clean the item and place it in the metal recycling bin.";
-      case "organic":
-        return "Dispose of it in the organic waste or compost bin if available.";
-      default:
-        return "Dispose of the item in the correct recycling bin.";
-    }
-  }
-
-  Future<void> _saveScan() async {
-    if (result == null) {
-      _showSnackBar("Please scan an item first");
-      return;
-    }
-
-    if (UserSession.backendUserId == null) {
-      _showSnackBar("User session not found");
-      return;
-    }
-
-    setState(() {
-      isSaving = true;
-      saveMessage = null;
     });
 
     try {
-      await ApiService.createScan(
-        userId: UserSession.backendUserId!,
-        materialType: result!,
-        weight: weight,
+      final response = await ApiService.uploadImage(
+        selectedImage!.path,
+        webBytes: webImageBytes,
       );
 
-      setState(() {
-        isSaving = false;
-        saveMessage = "Scan saved successfully ✅";
-      });
+      print("AI RESULT: $response");
 
-      _showSnackBar("Scan saved to backend");
+      final recyclable = response["recyclable"];
+      final category = response["category"];
+      final dets = response["detections"];
+
+      String recText;
+
+      if (recyclable == true) {
+        recText = "Item is recyclable. Dispose correctly.";
+      } else {
+        recText = "This item cannot be recycled.";
+      }
+
+      setState(() {
+        isRecyclable = recyclable;
+        result = category;
+        recommendation = recText;
+        detections = dets;
+        isProcessing = false;
+      });
     } catch (e) {
       setState(() {
-        isSaving = false;
-        saveMessage = "Failed to save scan";
+        isProcessing = false;
       });
 
-      _showSnackBar("Error saving scan");
-    }
-  }
-
-  Color _typeColor(String type) {
-    switch (type.toLowerCase()) {
-      case "plastic":
-        return Colors.blue;
-      case "glass":
-        return Colors.green;
-      case "metal":
-        return Colors.orange;
-      case "organic":
-        return Colors.brown;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  IconData _typeIcon(String type) {
-    switch (type.toLowerCase()) {
-      case "plastic":
-        return Icons.local_drink;
-      case "glass":
-        return Icons.wine_bar_outlined;
-      case "metal":
-        return Icons.hardware;
-      case "organic":
-        return Icons.compost;
-      default:
-        return Icons.recycling;
+      _showSnackBar("Error connecting to AI backend");
+      print("ERROR: $e");
     }
   }
 
@@ -183,79 +116,133 @@ class _ScanPageState extends State<ScanPage> {
     if (selectedImage == null) {
       return Container(
         height: 240,
-        width: double.infinity,
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: Colors.green.shade100),
+          borderRadius: BorderRadius.circular(20),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.image_outlined,
-              size: 60,
-              color: Colors.green.shade300,
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              "No image selected yet",
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.black54,
-              ),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              "Use the camera or gallery to start scanning",
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.black45,
-              ),
-            ),
-          ],
-        ),
+        child: const Center(child: Text("No image selected")),
       );
     }
 
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: kIsWeb
+          ? Image.memory(webImageBytes!, height: 240, fit: BoxFit.cover)
+          : Image.network(selectedImage!.path,
+              height: 240, fit: BoxFit.cover),
+    );
+  }
+
+  // =========================
+  // 🎯 BEAUTIFUL RESULT CARD
+  // =========================
+  Widget _buildResultCard() {
+    if (result == null) return const SizedBox();
+
     return Container(
-      height: 240,
-      width: double.infinity,
+      margin: const EdgeInsets.only(top: 20),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
         color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
+          )
         ],
       ),
-      clipBehavior: Clip.antiAlias,
-      child: kIsWeb
-          ? (webImageBytes != null
-              ? Image.memory(
-                  webImageBytes!,
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                )
-              : const Center(child: Text("Unable to preview image")))
-          : Image.network(
-              selectedImage!.path,
-              fit: BoxFit.cover,
-              width: double.infinity,
-              errorBuilder: (_, __, ___) {
-                return const Center(child: Text("Unable to preview image"));
-              },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ♻️ Recyclability Badge
+          Row(
+            children: [
+              Icon(
+                isRecyclable == true ? Icons.check_circle : Icons.cancel,
+                color: isRecyclable == true ? Colors.green : Colors.red,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                isRecyclable == true ? "Recyclable" : "Not Recyclable",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color:
+                      isRecyclable == true ? Colors.green : Colors.red,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 15),
+
+          // 📦 Category
+          Text(
+            "Category",
+            style: TextStyle(color: Colors.grey[600]),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            result!,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
             ),
+          ),
+
+          const SizedBox(height: 15),
+
+          // 💡 Recommendation
+          Text(
+            recommendation ?? "",
+            style: const TextStyle(fontSize: 15),
+          ),
+
+          // 🔍 Detections
+          if (detections != null && detections!.isNotEmpty) ...[
+            const SizedBox(height: 18),
+            const Divider(),
+            const SizedBox(height: 10),
+
+            const Text(
+              "Detected Objects",
+              style: TextStyle(
+                  fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+
+            const SizedBox(height: 10),
+
+            ...detections!.map((det) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisAlignment:
+                      MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(det["label"]),
+                    Text(
+                      "${(det["confidence"] * 100).toStringAsFixed(1)}%",
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ],
+        ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final scanColor = result != null ? _typeColor(result!) : Colors.green;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text("Smart Scan"),
@@ -265,43 +252,6 @@ class _ScanPageState extends State<ScanPage> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              gradient: LinearGradient(
-                colors: [
-                  Colors.green.shade700,
-                  Colors.green.shade500,
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "AI-Powered Waste Scan",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  "Capture or upload an item to classify its material and save the recycling result.",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-
           _buildImagePreview(),
           const SizedBox(height: 18),
 
@@ -312,14 +262,6 @@ class _ScanPageState extends State<ScanPage> {
                   onPressed: isProcessing ? null : pickFromCamera,
                   icon: const Icon(Icons.camera_alt),
                   label: const Text("Camera"),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green.shade700,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -328,290 +270,17 @@ class _ScanPageState extends State<ScanPage> {
                   onPressed: isProcessing ? null : pickFromGallery,
                   icon: const Icon(Icons.photo_library_outlined),
                   label: const Text("Gallery"),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.green.shade700,
-                    side: BorderSide(color: Colors.green.shade700),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                  ),
                 ),
               ),
             ],
           ),
 
-          const SizedBox(height: 22),
-
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(22),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "Estimated Weight",
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  "${weight.toStringAsFixed(1)} kg",
-                  style: TextStyle(
-                    color: Colors.green.shade700,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                Slider(
-                  value: weight,
-                  min: 0.5,
-                  max: 5.0,
-                  divisions: 9,
-                  label: weight.toStringAsFixed(1),
-                  activeColor: Colors.green,
-                  onChanged: (value) {
-                    setState(() => weight = value);
-                  },
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 22),
-
-          if (isProcessing)
-            Container(
-              padding: const EdgeInsets.all(22),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(22),
-              ),
-              child: const Column(
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 14),
-                  Text(
-                    "Analyzing item...",
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  SizedBox(height: 6),
-                  Text(
-                    "Please wait while the classification is being generated.",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.black54),
-                  ),
-                ],
-              ),
-            ),
-
-          if (!isProcessing && result != null) ...[
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(22),
-                boxShadow: [
-                  BoxShadow(
-                    color: scanColor.withOpacity(0.10),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        backgroundColor: scanColor.withOpacity(0.15),
-                        child: Icon(
-                          _typeIcon(result!),
-                          color: scanColor,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          result!.toUpperCase(),
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: scanColor.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          "${((double.tryParse(confidence ?? "0") ?? 0) * 100).toStringAsFixed(0)}%",
-                          style: TextStyle(
-                            color: scanColor,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  _resultRow("Classification", result!.toUpperCase()),
-                  _resultRow("Confidence", confidence ?? "-"),
-                  _resultRow("Estimated Weight", "${weight.toStringAsFixed(1)} kg"),
-                  const SizedBox(height: 14),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.lightbulb_outline, color: scanColor),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            recommendation ?? "",
-                            style: const TextStyle(fontSize: 14),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: isSaving ? null : _saveScan,
-                icon: isSaving
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.save),
-                label: Text(isSaving ? "Saving..." : "Save Scan"),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green.shade700,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                ),
-              ),
-            ),
-          ],
-
-          if (saveMessage != null) ...[
-            const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: saveMessage!.contains("success")
-                    ? Colors.green.withOpacity(0.12)
-                    : Colors.red.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    saveMessage!.contains("success")
-                        ? Icons.check_circle
-                        : Icons.error_outline,
-                    color: saveMessage!.contains("success")
-                        ? Colors.green
-                        : Colors.red,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      saveMessage!,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-
           const SizedBox(height: 20),
 
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.amber.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: const Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.info_outline, color: Colors.orange),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    "This version uses temporary classification logic to demonstrate the full workflow until AI model integration is finalized.",
-                    style: TextStyle(fontSize: 13),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-        ],
-      ),
-    );
-  }
+          if (isProcessing)
+            const Center(child: CircularProgressIndicator()),
 
-  Widget _resultRow(String title, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 130,
-            child: Text(
-              title,
-              style: const TextStyle(
-                color: Colors.black54,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
+          if (!isProcessing) _buildResultCard(),
         ],
       ),
     );

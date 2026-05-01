@@ -1,6 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-
+import os
+import shutil
+from fastapi import UploadFile, File
+from app.services.model_service import run_pipeline
 # Firebase Admin
 import firebase_admin
 from firebase_admin import credentials
@@ -13,7 +16,11 @@ from app.db.session import engine
 from app.db.base import Base
 
 # Import models
-from app.models import user, scan, recycling_center
+from app.model import user, scan, recycling_center
+
+# Other imports
+import shutil
+import os
 
 app = FastAPI(title="Smart Pre Recycling Backend")
 
@@ -44,6 +51,21 @@ app.include_router(health.router)
 app.include_router(users.router)
 app.include_router(scans.router)
 app.include_router(recycling_centers.router)
+
+# ================= AI PREDICTION =================
+UPLOAD_FOLDER = "uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+@app.post("/predict")
+async def predict(file: UploadFile = File(...)):
+    file_path = os.path.join("uploads", file.filename)
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    result = run_pipeline(file_path)
+
+    return result
 
 # ================= Root =================
 @app.get("/")
