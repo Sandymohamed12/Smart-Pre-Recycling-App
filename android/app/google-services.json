@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "18065069966",
+    "project_id": "smart-pre-recycling-e3287",
+    "storage_bucket": "smart-pre-recycling-e3287.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:18065069966:android:d334b8ab6786bb2d1c76df",
+        "android_client_info": {
+          "package_name": "com.zewail.smart_pre_recycling"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "18065069966-h136oejs8okt6fjcq1gjbih235a2mdn2.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDvikAZ7Aage939y7yASGnFSGjrBq4Y_pU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "18065069966-h136oejs8okt6fjcq1gjbih235a2mdn2.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,57 @@
+name: smart_pre_recycling
+description: Smart Pre-Recycling App
+publish_to: "none"
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.2.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # Firebase
+  firebase_core: ^2.30.0
+  firebase_auth: ^4.19.0
+  cloud_firestore: ^4.17.5
+
+  # Social Auth
+  google_sign_in: ^6.2.1
+  flutter_facebook_auth: ^7.0.0
+  sign_in_with_apple: ^6.1.0
+
+  # Charts & UI
+  fl_chart: ^0.66.0
+  lottie: ^2.7.0
+
+  # Image
+  image_picker: ^1.0.7
+
+  # Map (OpenStreetMap - Free)
+  flutter_map: ^6.1.0
+  latlong2: ^0.9.0
+  geolocator: ^10.1.0
+
+  # API
+  http: ^1.2.0
+
+  # PDF & Share
+  pdf: ^3.10.7
+  printing: ^5.12.0
+  share_plus: ^7.2.1
+  path_provider: ^2.1.2
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
