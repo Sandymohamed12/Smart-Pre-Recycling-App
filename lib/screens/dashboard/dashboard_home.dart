@@ -269,7 +269,7 @@ class _DashboardHomeState extends State<DashboardHome> {
       onRefresh: loadDashboardData,
       child: isLoading
           ? ListView(
-              children: [
+              children: const [
                 SizedBox(height: 250),
                 Center(child: CircularProgressIndicator()),
               ],
