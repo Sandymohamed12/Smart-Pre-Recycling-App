@@ -268,7 +268,7 @@ class _DashboardStatsState extends State<DashboardStats>
                   padding: const EdgeInsets.all(24),
                   children: [
                     const SizedBox(height: 140),
-                    Icon(
+                    const Icon(
                       Icons.error_outline,
                       size: 60,
                       color: Colors.red,
