@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
@@ -113,30 +114,37 @@ class ApiService {
   }
 
   // =========================
-  // 🔹 Get User Scans (History)
+  // 🔥 AI Prediction (FIXED FOR WEB)
   // =========================
-  static Future<List<dynamic>> getUserScans(int userId) async {
-    final user = FirebaseAuth.instance.currentUser;
+  static Future<Map<String, dynamic>> uploadImage(
+    String filePath, {
+    Uint8List? webBytes,
+  }) async {
+    final url = Uri.parse("$baseUrl/predict");
 
-    if (user == null) {
-      throw Exception("User not logged in");
+    var request = http.MultipartRequest('POST', url);
+
+    if (kIsWeb) {
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          webBytes!,
+          filename: "image.jpg",
+        ),
+      );
+    } else {
+      request.files.add(
+        await http.MultipartFile.fromPath('file', filePath),
+      );
     }
 
-    final idToken = await user.getIdToken();
-
-    final url = Uri.parse("$baseUrl/scans/user/$userId");
-
-    final response = await http.get(
-      url,
-      headers: {
-        "Authorization": "Bearer $idToken",
-      },
-    );
+    var response = await request.send();
+    var responseData = await response.stream.bytesToString();
 
     if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+      return jsonDecode(responseData);
     } else {
-      throw Exception("Failed to load history: ${response.body}");
+      throw Exception("Prediction failed: $responseData");
     }
   }
 }

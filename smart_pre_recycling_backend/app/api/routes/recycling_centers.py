@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
-from app.models.recycling_center import RecyclingCenter
+from app.model.recycling_center import RecyclingCenter
 
 router = APIRouter(prefix="/centers", tags=["Recycling Centers"])
 
