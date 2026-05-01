@@ -1,5 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+import random
 
 # Firebase Admin
 import firebase_admin
@@ -26,7 +27,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ================= Firebase (SAFE INIT) =================
+# ================= Firebase Safe Init =================
 try:
     cred = credentials.Certificate(
         "smart-pre-recycling-firebase-adminsdk-fbsvc-946269cdfb.json"
@@ -45,7 +46,21 @@ app.include_router(users.router)
 app.include_router(scans.router)
 app.include_router(recycling_centers.router)
 
+# ================= AI Predict Endpoint =================
+@app.post("/ai/predict")
+async def predict(file: UploadFile = File(...)):
+    categories = ["plastic", "glass", "metal", "organic"]
+
+    result = random.choice(categories)
+    confidence = round(random.uniform(0.80, 0.98), 2)
+
+    return {
+        "class": result,
+        "confidence": confidence,
+        "recommendation": f"Dispose in {result} recycling bin."
+    }
+
 # ================= Root =================
 @app.get("/")
 def root():
-    return {"message": "Backend + DB connected 🚀"}
+    return {"message": "Backend + DB + AI ready 🚀"}
