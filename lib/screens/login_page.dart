@@ -1,3 +1,4 @@
+import '../services/auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/api_service.dart';
@@ -183,16 +184,75 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ),
                 const SizedBox(height: 20),
-                TextButton(
-                  onPressed: () {
-                    setState(() => isLogin = !isLogin);
-                  },
-                  child: Text(
-                    isLogin
-                        ? "Don’t have an account? Sign up"
-                        : "Already have an account? Login",
-                  ),
-                ),
+
+TextButton(
+  onPressed: () {
+    setState(() => isLogin = !isLogin);
+  },
+  child: Text(
+    isLogin
+        ? "Don’t have an account? Sign up"
+        : "Already have an account? Login",
+  ),
+),
+
+const SizedBox(height: 20),
+
+SizedBox(
+  width: double.infinity,
+  child: ElevatedButton.icon(
+    icon: const Icon(Icons.login),
+    label: const Text("Continue with Google"),
+    style: ElevatedButton.styleFrom(
+      backgroundColor: Colors.white,
+      foregroundColor: Colors.black,
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(30),
+      ),
+    ),
+    onPressed: () async {
+      try {
+        final credential =
+            await AuthService.signInWithGoogle();
+
+        final firebaseUser = credential.user;
+
+        if (firebaseUser == null) return;
+
+        final backendUser = await ApiService.syncUser(
+          firebaseUid: firebaseUser.uid,
+          email: firebaseUser.email ?? "",
+          name: firebaseUser.displayName ??
+              firebaseUser.email?.split("@")[0] ??
+              "User",
+        );
+
+        UserSession.backendUserId =
+            backendUser["id"];
+
+        if (!context.mounted) return;
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const DashboardPage(),
+          ),
+        );
+      } catch (e) {
+        if (!context.mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              "Google Sign-In failed: $e",
+            ),
+          ),
+        );
+      }
+    },
+  ),
+),
               ],
             ),
           ),
