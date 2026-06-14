@@ -69,8 +69,6 @@ def run_model3(img_path):
             })
 
     return detections
-
-# ================= PIPELINE =================
 def run_pipeline(image_path):
 
     # ---------- MODEL 1 ----------
@@ -80,28 +78,71 @@ def run_pipeline(image_path):
     prob = float(pred1[0][0])
     recyclable = prob < 0.5
 
-    print("Model1 prob:", prob)
+    print("Model1 probability:", prob)
     print("Recyclable:", recyclable)
 
+    # STOP HERE IF NOT RECYCLABLE
+    if not recyclable:
+        print("Item is not recyclable. Pipeline stopped.")
+
+        return {
+            "recyclable": False,
+            "category": "Not recyclable",
+            "detections": []
+        }
+
     # ---------- MODEL 2 ----------
-    if recyclable:
-        img2 = preprocess_model2(image_path)
-        pred2 = model2.predict(img2)
+    img2 = preprocess_model2(image_path)
+    pred2 = model2.predict(img2)
 
-        class_index = np.argmax(pred2)
-        category = class_names_model2[class_index]
+    class_index = np.argmax(pred2)
+    category = class_names_model2[class_index]
 
-        print("Model2 category:", category)
-    else:
-        category = "Not recyclable"
+    print("Category:", category)
 
     # ---------- MODEL 3 ----------
     detections = run_model3(image_path)
 
-    print("YOLO detections:", detections)
+    print("Detections:", detections)
 
     return {
-        "recyclable": bool(recyclable),
+        "recyclable": True,
         "category": category,
         "detections": detections
     }
+
+# # ================= PIPELINE =================
+# def run_pipeline(image_path):
+
+#     # ---------- MODEL 1 ----------
+#     img1 = preprocess_model1(image_path)
+#     pred1 = model1.predict(img1)
+
+#     prob = float(pred1[0][0])
+#     recyclable = prob < 0.5
+
+#     print("Model1 prob:", prob)
+#     print("Recyclable:", recyclable)
+
+#     # ---------- MODEL 2 ----------
+#     if recyclable:
+#         img2 = preprocess_model2(image_path)
+#         pred2 = model2.predict(img2)
+
+#         class_index = np.argmax(pred2)
+#         category = class_names_model2[class_index]
+
+#         print("Model2 category:", category)
+#     else:
+#         category = "Not recyclable"
+
+#     # ---------- MODEL 3 ----------
+#     detections = run_model3(image_path)
+
+#     print("YOLO detections:", detections)
+
+#     return {
+#         "recyclable": bool(recyclable),
+#         "category": category,
+#         "detections": detections
+#     }
