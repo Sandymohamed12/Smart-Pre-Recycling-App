@@ -40,17 +40,52 @@ class _LoginPageState extends State<LoginPage> {
           password: _password.text.trim(),
         );
       } else {
-        credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-          email: _email.text.trim(),
-          password: _password.text.trim(),
-        );
-      }
+  credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+    email: _email.text.trim(),
+    password: _password.text.trim(),
+  );
+
+  await credential.user!.sendEmailVerification();
+
+  if (!mounted) return;
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text(
+        "Verification email sent. Please verify your email before logging in.",
+      ),
+    ),
+  );
+
+  await FirebaseAuth.instance.signOut();
+  return;
+}
 
       final firebaseUser = credential.user;
 
       if (firebaseUser == null) {
         throw Exception("Firebase user not found");
       }
+
+      if (isLogin) {
+  await firebaseUser.reload();
+
+  if (!firebaseUser.emailVerified) {
+    await FirebaseAuth.instance.signOut();
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          "Please verify your email before logging in.",
+        ),
+      ),
+    );
+
+    return;
+  }
+}
 
       final backendUser = await ApiService.syncUser(
         firebaseUid: firebaseUser.uid,
@@ -198,13 +233,14 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                 ),
-                Align(
-  alignment: Alignment.centerRight,
-  child: TextButton(
-    onPressed: _resetPassword,
-    child: const Text("Forgot Password?"),
+ if (isLogin)
+  Align(
+    alignment: Alignment.centerRight,
+    child: TextButton(
+      onPressed: _resetPassword,
+      child: const Text("Forgot Password?"),
+    ),
   ),
-),
 
 const SizedBox(height: 20),
                 loading
