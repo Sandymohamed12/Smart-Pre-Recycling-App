@@ -99,6 +99,42 @@ class _LoginPageState extends State<LoginPage> {
       }
     }
   }
+ Future<void> _resetPassword() async {
+    if (_email.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please enter your email first"),
+        ),
+      );
+      return;
+    }
+
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(
+        email: _email.text.trim(),
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Password reset email sent. Check your inbox.",
+          ),
+        ),
+      );
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.message ?? "Failed to send reset email",
+          ),
+        ),
+      );
+    }
+  }
 
   @override
   void dispose() {
@@ -162,7 +198,15 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 30),
+                Align(
+  alignment: Alignment.centerRight,
+  child: TextButton(
+    onPressed: _resetPassword,
+    child: const Text("Forgot Password?"),
+  ),
+),
+
+const SizedBox(height: 20),
                 loading
                     ? const CircularProgressIndicator()
                     : SizedBox(
