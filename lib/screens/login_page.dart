@@ -1,3 +1,4 @@
+import '../services/auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/api_service.dart';
@@ -39,17 +40,52 @@ class _LoginPageState extends State<LoginPage> {
           password: _password.text.trim(),
         );
       } else {
-        credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-          email: _email.text.trim(),
-          password: _password.text.trim(),
-        );
-      }
+  credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+    email: _email.text.trim(),
+    password: _password.text.trim(),
+  );
+
+  await credential.user!.sendEmailVerification();
+
+  if (!mounted) return;
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text(
+        "Verification email sent. Please verify your email before logging in.",
+      ),
+    ),
+  );
+
+  await FirebaseAuth.instance.signOut();
+  return;
+}
 
       final firebaseUser = credential.user;
 
       if (firebaseUser == null) {
         throw Exception("Firebase user not found");
       }
+
+      if (isLogin) {
+  await firebaseUser.reload();
+
+  if (!firebaseUser.emailVerified) {
+    await FirebaseAuth.instance.signOut();
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          "Please verify your email before logging in.",
+        ),
+      ),
+    );
+
+    return;
+  }
+}
 
       final backendUser = await ApiService.syncUser(
         firebaseUid: firebaseUser.uid,
@@ -96,6 +132,42 @@ class _LoginPageState extends State<LoginPage> {
       if (mounted) {
         setState(() => loading = false);
       }
+    }
+  }
+ Future<void> _resetPassword() async {
+    if (_email.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please enter your email first"),
+        ),
+      );
+      return;
+    }
+
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(
+        email: _email.text.trim(),
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Password reset email sent. Check your inbox.",
+          ),
+        ),
+      );
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.message ?? "Failed to send reset email",
+          ),
+        ),
+      );
     }
   }
 
@@ -161,7 +233,16 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 30),
+ if (isLogin)
+  Align(
+    alignment: Alignment.centerRight,
+    child: TextButton(
+      onPressed: _resetPassword,
+      child: const Text("Forgot Password?"),
+    ),
+  ),
+
+const SizedBox(height: 20),
                 loading
                     ? const CircularProgressIndicator()
                     : SizedBox(
@@ -183,16 +264,75 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ),
                 const SizedBox(height: 20),
-                TextButton(
-                  onPressed: () {
-                    setState(() => isLogin = !isLogin);
-                  },
-                  child: Text(
-                    isLogin
-                        ? "Don’t have an account? Sign up"
-                        : "Already have an account? Login",
-                  ),
-                ),
+
+TextButton(
+  onPressed: () {
+    setState(() => isLogin = !isLogin);
+  },
+  child: Text(
+    isLogin
+        ? "Don’t have an account? Sign up"
+        : "Already have an account? Login",
+  ),
+),
+
+const SizedBox(height: 20),
+
+SizedBox(
+  width: double.infinity,
+  child: ElevatedButton.icon(
+    icon: const Icon(Icons.login),
+    label: const Text("Continue with Google"),
+    style: ElevatedButton.styleFrom(
+      backgroundColor: Colors.white,
+      foregroundColor: Colors.black,
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(30),
+      ),
+    ),
+    onPressed: () async {
+      try {
+        final credential =
+            await AuthService.signInWithGoogle();
+
+        final firebaseUser = credential.user;
+
+        if (firebaseUser == null) return;
+
+        final backendUser = await ApiService.syncUser(
+          firebaseUid: firebaseUser.uid,
+          email: firebaseUser.email ?? "",
+          name: firebaseUser.displayName ??
+              firebaseUser.email?.split("@")[0] ??
+              "User",
+        );
+
+        UserSession.backendUserId =
+            backendUser["id"];
+
+        if (!context.mounted) return;
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const DashboardPage(),
+          ),
+        );
+      } catch (e) {
+        if (!context.mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              "Google Sign-In failed: $e",
+            ),
+          ),
+        );
+      }
+    },
+  ),
+),
               ],
             ),
           ),
