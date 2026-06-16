@@ -30,7 +30,7 @@ class _DashboardHistoryState extends State<DashboardHistory> {
       isLoading = true;
       errorMessage = null;
     });
-
+  
     try {
       if (UserSession.backendUserId == null) {
         setState(() {
@@ -39,6 +39,7 @@ class _DashboardHistoryState extends State<DashboardHistory> {
         });
         return;
       }
+      
 
       final response = await http.get(
         Uri.parse("$baseUrl/scans/user/${UserSession.backendUserId}"),
@@ -64,6 +65,34 @@ class _DashboardHistoryState extends State<DashboardHistory> {
       });
     }
   }
+  Future<void> deleteScan(int scanId) async {
+  try {
+    final response = await http.delete(
+      Uri.parse("$baseUrl/scans/$scanId"),
+    );
+
+    if (response.statusCode == 200) {
+      fetchHistory();
+    }
+  } catch (e) {
+    debugPrint("Delete failed: $e");
+  }
+}
+Future<void> clearHistory() async {
+  try {
+    final response = await http.delete(
+      Uri.parse(
+        "$baseUrl/scans/user/${UserSession.backendUserId}/all",
+      ),
+    );
+
+    if (response.statusCode == 200) {
+      fetchHistory();
+    }
+  } catch (e) {
+    debugPrint("Clear history failed: $e");
+  }
+}
 
   Color getColor(String type) {
     switch (type.toLowerCase()) {
@@ -139,16 +168,65 @@ class _DashboardHistoryState extends State<DashboardHistory> {
     }
 
     return RefreshIndicator(
-      onRefresh: fetchHistory,
-      child: ListView.builder(
+  onRefresh: fetchHistory,
+  child: Column(
+    children: [
+      Padding(
         padding: const EdgeInsets.all(16),
-        itemCount: scans.length,
+        child: Align(
+          alignment: Alignment.centerRight,
+          child: ElevatedButton.icon(
+            icon: const Icon(Icons.delete_sweep),
+            label: const Text("Clear History"),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text("Clear History"),
+                  content: const Text(
+                    "Are you sure you want to delete ALL scans?",
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () =>
+                          Navigator.pop(context, false),
+                      child: const Text("Cancel"),
+                    ),
+                    ElevatedButton(
+                      onPressed: () =>
+                          Navigator.pop(context, true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                      ),
+                      child: const Text("Delete All"),
+                    ),
+                  ],
+                ),
+              );
+
+              if (confirm == true) {
+                clearHistory();
+              }
+            },
+          ),
+        ),
+      ),
+
+      Expanded(
+        child: ListView.builder(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 16,
+          ),
+          itemCount: scans.length,
         itemBuilder: (context, index) {
           final scan = scans[index];
-          final type = scan["material_type"].toString();
-          final weight = scan["weight"];
-          final co2 = scan["co2_saved"];
-          final date = formatDate(scan["created_at"].toString());
+final scanId = scan["id"];
+final type = scan["material_type"].toString();
+final date = formatDate(scan["created_at"].toString());
 
           return Container(
             margin: const EdgeInsets.only(bottom: 14),
@@ -186,27 +264,70 @@ class _DashboardHistoryState extends State<DashboardHistory> {
                 ),
               ),
               subtitle: Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("Weight: $weight kg"),
-                    const SizedBox(height: 4),
-                    Text("CO₂ Saved: $co2"),
-                  ],
-                ),
-              ),
-              trailing: Text(
-                date,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Colors.black54,
-                ),
-              ),
+  padding: const EdgeInsets.only(top: 8),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      const Text(
+        "Scan completed",
+        style: TextStyle(
+          fontSize: 14,
+          color: Colors.black54,
+        ),
+      ),
+      const SizedBox(height: 4),
+      Text(
+        date,
+        style: const TextStyle(
+          fontSize: 12,
+          color: Colors.grey,
+        ),
+      ),
+    ],
+  ),
+),
+              trailing: IconButton(
+  icon: const Icon(
+    Icons.delete,
+    color: Colors.red,
+  ),
+  onPressed: () async {
+  final confirm = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text("Delete Scan"),
+      content: const Text(
+        "Are you sure you want to delete this scan?",
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text("Cancel"),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, true),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red,
+          ),
+          child: const Text("Delete"),
+        ),
+      ],
+    ),
+  );
+
+  if (confirm == true) {
+    deleteScan(scanId);
+  }
+},
+),
             ),
           );
         },
-      ),
-    );
+      ), // ListView.builder
+    ), // Expanded
+  ], // children
+), // Column
+); // RefreshIndicator
   }
 }

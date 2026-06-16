@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:firebase_auth/firebase_auth.dart';
 
 class ApiService {
   static String get baseUrl {
@@ -75,43 +74,76 @@ class ApiService {
     }
   }
 
-  // =========================
-  // 🔹 Create Scan
-  // =========================
-  static Future<Map<String, dynamic>> createScan({
-    required int userId,
-    required String materialType,
-    required double weight,
-  }) async {
-    final user = FirebaseAuth.instance.currentUser;
+// =========================
+// 🔹 Create Scan
+// =========================
+static Future<Map<String, dynamic>> createScan({
+  required int userId,
+  required String materialType,
+  required bool recyclable,
+}) async {
+  final url = Uri.parse("$baseUrl/scans/");
 
-    if (user == null) {
-      throw Exception("User not logged in");
-    }
+  final response = await http.post(
+    url,
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: jsonEncode({
+      "user_id": userId,
+      "material_type": materialType,
+      "recyclable": recyclable,
+    }),
+  );
 
-    final idToken = await user.getIdToken();
-
-    final url = Uri.parse("$baseUrl/scans/");
-
-    final response = await http.post(
-      url,
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer $idToken",
-      },
-      body: jsonEncode({
-        "user_id": userId,
-        "material_type": materialType,
-        "weight": weight,
-      }),
+  if (response.statusCode == 200 ||
+      response.statusCode == 201) {
+    return jsonDecode(response.body);
+  } else {
+    throw Exception(
+      "Failed to create scan: ${response.body}",
     );
-
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      return jsonDecode(response.body);
-    } else {
-      throw Exception("Failed to create scan: ${response.body}");
-    }
   }
+}
+  // =========================
+// 🔹 Get User Scans
+// =========================
+static Future<List<dynamic>> getUserScans(
+  int userId,
+) async {
+  final url = Uri.parse(
+    "$baseUrl/scans/user/$userId",
+  );
+
+  final response = await http.get(url);
+
+  if (response.statusCode == 200) {
+    return jsonDecode(response.body);
+  } else {
+    throw Exception(
+      "Failed to load scans",
+    );
+  }
+}
+
+// =========================
+// 🔹 Delete Scan
+// =========================
+static Future<void> deleteScan(
+  int scanId,
+) async {
+  final url = Uri.parse(
+    "$baseUrl/scans/$scanId",
+  );
+
+  final response = await http.delete(url);
+
+  if (response.statusCode != 200) {
+    throw Exception(
+      "Failed to delete scan",
+    );
+  }
+}
 
   // =========================
   // 🔥 AI Prediction (FIXED FOR WEB)
