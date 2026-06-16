@@ -5,15 +5,14 @@ from datetime import datetime
 class ScanCreate(BaseModel):
     user_id: int
     material_type: str
-    weight: float
+    recyclable: bool
 
 
 class ScanResponse(BaseModel):
     id: int
     user_id: int
     material_type: str
-    weight: float
-    co2_saved: float
+    recyclable: bool
     created_at: datetime
 
     class Config:

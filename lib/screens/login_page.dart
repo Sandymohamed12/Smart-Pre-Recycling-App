@@ -19,121 +19,132 @@ class _LoginPageState extends State<LoginPage> {
   bool isLogin = true;
   bool loading = false;
 
-  Future<void> _submit() async {
-    if (_email.text.trim().isEmpty || _password.text.trim().isEmpty) {
+Future<void> _submit() async {
+  if (_email.text.trim().isEmpty || _password.text.trim().isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Please enter email and password"),
+      ),
+    );
+    return;
+  }
+
+  setState(() => loading = true);
+
+  try {
+    UserCredential credential;
+
+    if (isLogin) {
+      credential =
+          await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _email.text.trim(),
+        password: _password.text.trim(),
+      );
+    } else {
+      credential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _email.text.trim(),
+        password: _password.text.trim(),
+      );
+
+      await credential.user!.sendEmailVerification();
+
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Please enter email and password"),
+          content: Text(
+            "Verification email sent. Please verify your email before logging in.",
+          ),
         ),
       );
+
+      await FirebaseAuth.instance.signOut();
       return;
     }
 
-    setState(() => loading = true);
+    final firebaseUser = credential.user;
 
-    try {
-      UserCredential credential;
+    if (firebaseUser == null) {
+      throw Exception("Firebase user not found");
+    }
 
-      if (isLogin) {
-        credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: _email.text.trim(),
-          password: _password.text.trim(),
+    if (isLogin) {
+      await firebaseUser.reload();
+
+      if (!firebaseUser.emailVerified) {
+        await FirebaseAuth.instance.signOut();
+
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "Please verify your email before logging in.",
+            ),
+          ),
         );
-      } else {
-  credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-    email: _email.text.trim(),
-    password: _password.text.trim(),
-  );
 
-  await credential.user!.sendEmailVerification();
-
-  if (!mounted) return;
-
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(
-      content: Text(
-        "Verification email sent. Please verify your email before logging in.",
-      ),
-    ),
-  );
-
-  await FirebaseAuth.instance.signOut();
-  return;
-}
-
-      final firebaseUser = credential.user;
-
-      if (firebaseUser == null) {
-        throw Exception("Firebase user not found");
+        return;
       }
+    }
 
-      if (isLogin) {
-  await firebaseUser.reload();
+    final backendUser = await ApiService.syncUser(
+      firebaseUid: firebaseUser.uid,
+      email: firebaseUser.email ?? "",
+      name: firebaseUser.email?.split("@")[0] ?? "User",
+    ).timeout(const Duration(seconds: 8));
 
-  if (!firebaseUser.emailVerified) {
-    await FirebaseAuth.instance.signOut();
+    debugPrint("BACKEND RESPONSE: $backendUser");
+
+    UserSession.backendUserId = backendUser["id"];
+
+    debugPrint(
+      "Backend User ID Saved: ${UserSession.backendUserId}",
+    );
+
+    if (!mounted) return;
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const DashboardPage(),
+      ),
+    );
+  } on FirebaseAuthException catch (e) {
+    String message = e.message ?? "Authentication error";
+
+    if (e.code == 'user-not-found') {
+      message = "No user found for that email.";
+    } else if (e.code == 'wrong-password') {
+      message = "Wrong password provided.";
+    } else if (e.code == 'email-already-in-use') {
+      message = "This email is already in use.";
+    } else if (e.code == 'invalid-email') {
+      message = "Invalid email address.";
+    } else if (e.code == 'weak-password') {
+      message = "Password is too weak.";
+    }
 
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          "Please verify your email before logging in.",
-        ),
+      SnackBar(content: Text(message)),
+    );
+  } catch (e) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("Backend sync failed: $e"),
       ),
     );
-
-    return;
-  }
-}
-
-      final backendUser = await ApiService.syncUser(
-        firebaseUid: firebaseUser.uid,
-        email: firebaseUser.email ?? "",
-        name: firebaseUser.email?.split("@")[0] ?? "User",
-      ).timeout(const Duration(seconds: 8));
-
-      UserSession.backendUserId = backendUser["id"];
-      debugPrint("Backend User ID Saved: ${UserSession.backendUserId}");
-
-      if (!mounted) return;
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const DashboardPage(),
-        ),
-      );
-    } on FirebaseAuthException catch (e) {
-      String message = e.message ?? "Authentication error";
-
-      if (e.code == 'user-not-found') {
-        message = "No user found for that email.";
-      } else if (e.code == 'wrong-password') {
-        message = "Wrong password provided.";
-      } else if (e.code == 'email-already-in-use') {
-        message = "This email is already in use.";
-      } else if (e.code == 'invalid-email') {
-        message = "Invalid email address.";
-      } else if (e.code == 'weak-password') {
-        message = "Password is too weak.";
-      }
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Backend sync failed: $e")),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => loading = false);
-      }
+  } finally {
+    if (mounted) {
+      setState(() => loading = false);
     }
   }
+}
  Future<void> _resetPassword() async {
     if (_email.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(

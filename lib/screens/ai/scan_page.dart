@@ -1,3 +1,4 @@
+import '../../services/user_session.dart';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -80,6 +81,14 @@ class _ScanPageState extends State<ScanPage> {
       final recyclable = response["recyclable"];
       final category = response["category"];
       final dets = response["detections"];
+
+      if (UserSession.backendUserId != null) {
+        await ApiService.createScan(
+          userId: UserSession.backendUserId!,
+          materialType: category.toString(),
+          recyclable: recyclable == true,
+  );
+}
 
       String recText;
 
