@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../services/api_service.dart';
 import '../../services/user_session.dart';
 
@@ -37,7 +38,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Future<void> _saveProfile() async {
-    if (_nameController.text.trim().isEmpty) {
+    final name = _nameController.text.trim();
+
+    if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please enter your name")),
       );
@@ -56,7 +59,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     try {
       await ApiService.updateUser(
         userId: UserSession.backendUserId!,
-        name: _nameController.text.trim(),
+        name: name,
       );
 
       if (!mounted) return;
@@ -70,7 +73,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to update profile: $e")),
+        const SnackBar(content: Text("Failed to update profile")),
       );
     } finally {
       if (mounted) {
@@ -92,34 +95,61 @@ class _EditProfilePageState extends State<EditProfilePage> {
         child: Column(
           children: [
             Container(
-              padding: const EdgeInsets.all(22),
+              padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(22),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+                borderRadius: BorderRadius.circular(28),
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.green.shade800,
+                    Colors.green.shade500,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
               ),
               child: Column(
                 children: [
-                  const CircleAvatar(
-                    radius: 42,
-                    backgroundColor: Colors.green,
-                    child: Icon(
+                  CircleAvatar(
+                    radius: 48,
+                    backgroundColor: Colors.white.withOpacity(0.18),
+                    child: const Icon(
                       Icons.person,
-                      size: 44,
+                      size: 54,
                       color: Colors.white,
                     ),
                   ),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 16),
+                  const Text(
+                    "Update Your Profile",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    widget.currentEmail,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.88),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: _cardDecoration(),
+              child: Column(
+                children: [
                   TextField(
                     controller: _nameController,
+                    textInputAction: TextInputAction.done,
                     decoration: InputDecoration(
                       labelText: "Full Name",
+                      hintText: "Enter your name",
                       prefixIcon: const Icon(Icons.person_outline),
                       filled: true,
                       fillColor: Colors.grey.shade50,
@@ -167,7 +197,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
                     : const Icon(Icons.save),
                 label: Text(isSaving ? "Saving..." : "Save Changes"),
@@ -184,6 +217,20 @@ class _EditProfilePageState extends State<EditProfilePage> {
           ],
         ),
       ),
+    );
+  }
+
+  BoxDecoration _cardDecoration() {
+    return BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(24),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.055),
+          blurRadius: 14,
+          offset: const Offset(0, 6),
+        ),
+      ],
     );
   }
 }
