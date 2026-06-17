@@ -12,8 +12,14 @@ MODEL2_PATH = os.path.join(BASE_DIR, "models", "model2.h5")
 MODEL3_PATH = os.path.join(BASE_DIR, "models", "model3.pt")
 
 # ================= LOAD MODELS =================
-model1 = tf.keras.models.load_model(MODEL1_PATH)
-model2 = tf.keras.models.load_model(MODEL2_PATH)
+model1 = tf.keras.models.load_model(
+    MODEL1_PATH,
+    compile=False
+)
+model2 = tf.keras.models.load_model(
+    MODEL2_PATH,
+    compile=False
+)
 model3 = YOLO(MODEL3_PATH)
 
 # ================= CLASS NAMES =================
